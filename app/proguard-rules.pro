@@ -1,0 +1,4 @@
+-keep class com.souleven.wap.Cache { *; }
+-keep class com.souleven.wap.CachedClass { *; }
+-keep class com.souleven.wap.CacheManager { *; }
+-keep class com.souleven.wap.Main { *; }
