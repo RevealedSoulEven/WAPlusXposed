@@ -18,7 +18,7 @@ WAPlusXposed is a lightweight, efficient Xposed/LSPosed module designed to injec
 
 ## Installation
 
-1.  Download and install the latest `WAPlusXposed` APK from the Releases section.
+1.  Download and install the latest `WAPlusXposed` APK from the [Releases](https://github.com/RevealedSoulEven/WAPlusXposed/releases) section.
 2.  Open your **LSPosed** manager application.
 3.  Navigate to the modules section, locate **WAPlus**, and toggle **Enable Module**.
 5.  Force close or restart WhatsApp to apply the hooks.
@@ -39,7 +39,7 @@ This project would not be possible without the incredible work done by the devel
 
 * **[DexKit](https://github.com/LuckyPray/DexKit)** - For providing the powerful, high-performance APK signature searching capabilities.
 * **[LSPosed](https://github.com/LSPosed)** - For the modern, cutting-edge ART hooking framework implementation.
-* **[rovo89 (Xposed Framework)](https://github.com/rovo89/xposed)** - For the foundational revolutionary framework that inspired modern Android modding.
+* **[rovo89](https://github.com/rovo89/xposed)** - For the foundational revolutionary Xposed Framework that inspired modern Android modding.
 
 ---
 

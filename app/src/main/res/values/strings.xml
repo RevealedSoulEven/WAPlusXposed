@@ -1,5 +1,5 @@
 <resources>
-    <string name="app_name">WAPlus Unlocker</string>
+    <string name="app_name">WAPlus</string>
     <string name="xposed_description">WhatsApp Plus Unlocker</string>
     <array name="scope">
         <item>com.whatsapp</item>
