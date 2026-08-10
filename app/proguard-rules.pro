@@ -1,4 +1,4 @@
--keep class com.souleven.wap.Cache { *; }
--keep class com.souleven.wap.CachedClass { *; }
--keep class com.souleven.wap.CacheManager { *; }
--keep class com.souleven.wap.Main { *; }
+-keep class com.metaplusxposed.Cache { *; }
+-keep class com.metaplusxposed.CachedClass { *; }
+-keep class com.metaplusxposed.CacheManager { *; }
+-keep class com.metaplusxposed.Main { *; }

@@ -1,4 +1,4 @@
-package com.souleven.wap
+package com.metaplusxposed
 
 import de.robv.android.xposed.XposedBridge
 import de.robv.android.xposed.XposedHelpers

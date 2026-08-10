@@ -1,4 +1,4 @@
-package com.souleven.wap
+package com.metaplusxposed
 
 import de.robv.android.xposed.IXposedHookLoadPackage
 import de.robv.android.xposed.XC_MethodHook

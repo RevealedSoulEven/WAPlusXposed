@@ -4,11 +4,11 @@ plugins {
 }
 
 android {
-    namespace = "com.souleven.wap"
+    namespace = "com.metaplusxposed"
     compileSdk = 34
 
     defaultConfig {
-        applicationId = "com.souleven.wap"
+        applicationId = "com.metaplusxposed"
         minSdk = 24
         targetSdk = 34
         versionCode = 115
