@@ -1,7 +1,9 @@
 <resources>
     <string name="app_name">WAPlus</string>
-    <string name="xposed_description">WhatsApp Plus Unlocker</string>
+    <string name="xposed_description">WhatsApp / Instagram / Facebook Plus Unlocker</string>
     <array name="scope">
         <item>com.whatsapp</item>
+        <item>com.instagram.android</item>
+        <item>com.facebook.katana</item>
     </array>
 </resources>

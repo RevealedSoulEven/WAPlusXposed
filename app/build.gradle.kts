@@ -11,7 +11,7 @@ android {
         applicationId = "com.souleven.wap"
         minSdk = 24
         targetSdk = 34
-        versionCode = 103
+        versionCode = 115
         versionName = "1.0"
 
         ndk {
