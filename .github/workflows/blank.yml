@@ -1,4 +1,4 @@
-name: Build and Release WAPlusXposed
+name: Build and Release MetaPlusXposed
 
 on:
   workflow_dispatch:
