@@ -1,6 +1,10 @@
 # WAPlusXposed
 
-WAPlusXposed is a lightweight, efficient Xposed/LSPosed module designed to inject into and unlock premium customization features within WhatsApp. By utilizing dynamic APK analysis, the module seamlessly hooks target verification routines without relying on hardcoded offsets.
+WAPlusXposed is a lightweight Xposed module designed to unlock the <ins>official premium features</ins> within **WhatsApp** and **WhatsApp Business**. By utilizing dynamic APK analysis, the module supports newer WhatsApp versions automatically.
+
+> **🌟 What's New:** WhatsApp Business is now supported!
+
+> If the module is not updated for a while, don't assume it is dead. It may still work as it dynamically hooks to the methods so updating it is rarely required. If it doesn't work, feel free to [open an issue](https://github.com/RevealedSoulEven/WAPlusXposed/issues).
 
 ## Features
 
@@ -18,10 +22,11 @@ WAPlusXposed is a lightweight, efficient Xposed/LSPosed module designed to injec
 
 ## Installation
 
-1.  Download and install the latest `WAPlusXposed` APK from the [Releases](https://github.com/RevealedSoulEven/WAPlusXposed/releases) section.
+1.  Download and install the latest `WAPlus` APK from the [Releases](https://github.com/RevealedSoulEven/WAPlusXposed/releases) section.
 2.  Open your **LSPosed** manager application.
 3.  Navigate to the modules section, locate **WAPlus**, and toggle **Enable Module**.
-5.  Force close or restart WhatsApp to apply the hooks.
+4.  Ensure **WhatsApp** and/or **WhatsApp Business** are enabled in the scope.
+5.  Force close or restart WhatsApp / WhatsApp Business to apply the hooks.
 
 ---
 
