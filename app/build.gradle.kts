@@ -1,16 +1,17 @@
 plugins {
     alias(libs.plugins.android.application)
-    alias(libs.plugins.jetbrains.kotlin.android)
 }
 
 android {
     namespace = "com.souleven.wap"
-    compileSdk = 34
+    compileSdk {
+        version = release(37)
+    }
 
     defaultConfig {
         applicationId = "com.souleven.wap"
         minSdk = 24
-        targetSdk = 34
+        targetSdk = 37
         versionCode = 100
         versionName = "1.0"
 
@@ -22,14 +23,14 @@ android {
     }
 
     buildTypes {
-	debug {
+        release {
             isMinifyEnabled = true
             proguardFiles(
                 getDefaultProguardFile("proguard-android-optimize.txt"),
                 "proguard-rules.pro"
             )
         }
-        release {
+        debug {
             isMinifyEnabled = true
             proguardFiles(
                 getDefaultProguardFile("proguard-android-optimize.txt"),
@@ -43,16 +44,12 @@ android {
     }
 
     compileOptions {
-        sourceCompatibility = JavaVersion.VERSION_1_8
-        targetCompatibility = JavaVersion.VERSION_1_8
-    }
-    kotlinOptions {
-        jvmTarget = "1.8"
+        sourceCompatibility = JavaVersion.VERSION_17
+        targetCompatibility = JavaVersion.VERSION_17
     }
 }
 
 dependencies {
-
     compileOnly(files("libs/api-82.jar"))
     implementation("org.luckypray:dexkit:2.2.0")
 }
