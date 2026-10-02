@@ -9,45 +9,47 @@ import de.robv.android.xposed.callbacks.XC_LoadPackage.LoadPackageParam
 class Main : IXposedHookLoadPackage {
 
     companion object {
+        private val TARGET_PACKAGES = setOf("com.whatsapp", "com.whatsapp.w4b")
+
         init {
             System.loadLibrary("dexkit")
         }
     }
 
     override fun handleLoadPackage(lpparam: LoadPackageParam) {
-        if (lpparam.packageName != "com.whatsapp") return
+        if (lpparam.packageName !in TARGET_PACKAGES) return
 
-        XposedBridge.log("WAP: WhatsApp loaded")
+        XposedBridge.log("WAP: ${lpparam.packageName} loaded")
 
         val moduleVersion = BuildConfig.VERSION_CODE
         val waVersion: Long = CacheManager.getWhatsAppVersion(lpparam)
 
         if (waVersion == 0L) {
-            XposedBridge.log("WAP: Whatsapp Version cannot be determined. Terminating.")
+            XposedBridge.log("WAP: Version cannot be determined for ${lpparam.packageName}. Terminating.")
             return
         }
 
         try {
-            val cache = CacheManager.loadCache()
+            val cache = CacheManager.loadCache(lpparam.packageName)
 
             if (cache != null &&
                 cache.waVersion == waVersion &&
                 cache.moduleVersion == moduleVersion
             ) {
-                XposedBridge.log("WAP: Using cache")
+                XposedBridge.log("WAP: Using cache for ${lpparam.packageName}")
                 try {
                     hookFromCache(cache, lpparam)
                     XposedBridge.log("WAP: Cache hook success")
                     return
                 } catch (t: Throwable) {
                     XposedBridge.log("WAP: Cache failed : ${t.message}")
-                    CacheManager.deleteCache()
+                    CacheManager.deleteCache(lpparam.packageName)
                 }
             }
 
-            XposedBridge.log("WAP: Running DexKit scan")
+            XposedBridge.log("WAP: Running DexKit scan for ${lpparam.packageName}")
             val newCache = CacheManager.scan(lpparam, waVersion)
-            CacheManager.saveCache(newCache)
+            CacheManager.saveCache(lpparam.packageName, newCache)
             hookFromCache(newCache, lpparam)
             XposedBridge.log("WAP: Fresh scan complete")
 
@@ -56,9 +58,6 @@ class Main : IXposedHookLoadPackage {
         }
     }
 
-    /**
-     * Hook everything provided by the Cache data.
-     */
     private fun hookFromCache(cache: Cache, lpparam: LoadPackageParam) {
         val loader = lpparam.classLoader
         val enumClazz = XposedHelpers.findClass(cache.enumClass, loader)

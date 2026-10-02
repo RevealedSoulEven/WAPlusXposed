@@ -1,7 +1,8 @@
 <resources>
     <string name="app_name">WAPlus</string>
-    <string name="xposed_description">WhatsApp Plus Unlocker</string>
+    <string name="xposed_description">WhatsApp &amp; WA Business Plus Unlocker</string>
     <array name="scope">
         <item>com.whatsapp</item>
+        <item>com.whatsapp.w4b</item>
     </array>
 </resources>

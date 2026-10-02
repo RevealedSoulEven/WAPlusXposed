@@ -10,11 +10,10 @@ import java.io.File
 
 object CacheManager {
 
-    private val CACHE_PATH = "/data/data/com.whatsapp/files/wap.cache"
+    private fun getCacheFile(packageName: String): File {
+        return File("/data/data/$packageName/files/wap.cache")
+    }
 
-    /**
-     * Scan APK using DexKit to find matching classes and methods.
-     */
     fun scan(lpparam: LoadPackageParam, waVersion: Long): Cache {
         val apkPath = lpparam.appInfo.sourceDir
         val loader = lpparam.classLoader
@@ -23,20 +22,20 @@ object CacheManager {
         DexKitBridge.create(apkPath).use { bridge ->
             val enumClass = bridge.findClass {
                 matcher {
-                    modifiers = 0x4000  // ENUM
+                    modifiers = 0x4000
                     usingStrings("APP_THEMES", "APP_ICONS", "STICKERS")
                 }
             }.single()
 
             val enumName = enumClass.name
-            XposedBridge.log("WAP: " + "Enum = $enumName")
+            XposedBridge.log("WAP: Enum = $enumName")
 
             val candidates = bridge.findClass {
                 matcher {
                     usingStrings("FREE_TRIAL")
                 }
             }
-            XposedBridge.log("WAP: " + "Candidates = ${candidates.size}")
+            XposedBridge.log("WAP: Candidates = ${candidates.size}")
 
             candidates.forEach { classData ->
                 val clazz = classData.getInstance(loader)
@@ -47,7 +46,7 @@ object CacheManager {
                     if (method.parameterTypes.size != 1) return@forEach
                     if (method.parameterTypes[0].name != enumName) return@forEach
 
-                    XposedBridge.log("WAP: " + "Found ${clazz.name}.${method.name}")
+                    XposedBridge.log("WAP: Found ${clazz.name}.${method.name}")
                     methods += method.name
                 }
 
@@ -65,11 +64,11 @@ object CacheManager {
         }
     }
 
-    fun loadCache(): Cache? {
+    fun loadCache(packageName: String): Cache? {
         try {
-            val file = File(CACHE_PATH)
+            val file = getCacheFile(packageName)
             if (!file.exists()) {
-                XposedBridge.log("WAP: " + "Cache doesn't exist")
+                XposedBridge.log("WAP: Cache doesn't exist for $packageName")
                 return null
             }
 
@@ -100,8 +99,10 @@ object CacheManager {
         }
     }
 
-    fun saveCache(cache: Cache) {
+    fun saveCache(packageName: String, cache: Cache) {
         try {
+            val file = getCacheFile(packageName)
+            file.parentFile?.mkdirs()
             val root = JSONObject()
             root.put("waVersion", cache.waVersion)
             root.put("moduleVersion", cache.moduleVersion)
@@ -118,17 +119,17 @@ object CacheManager {
             }
             root.put("classes", classArray)
 
-            File(CACHE_PATH).writeText(root.toString())
-            XposedBridge.log("WAP: " + "Cache saved")
+            file.writeText(root.toString())
+            XposedBridge.log("WAP: Cache saved for $packageName")
         } catch (t: Throwable) {
             XposedBridge.log("WAP: " + t.stackTraceToString())
         }
     }
 
-    fun deleteCache() {
+    fun deleteCache(packageName: String) {
         try {
-            File(CACHE_PATH).delete()
-            XposedBridge.log("WAP: " + "Cache deleted")
+            getCacheFile(packageName).delete()
+            XposedBridge.log("WAP: Cache deleted for $packageName")
         } catch (t: Throwable) {
             XposedBridge.log("WAP: " + t.stackTraceToString())
         }
@@ -153,7 +154,6 @@ object CacheManager {
     }
 }
 
-// Data models for the Cache structure
 data class Cache(
     val waVersion: Long,
     val moduleVersion: Int,
