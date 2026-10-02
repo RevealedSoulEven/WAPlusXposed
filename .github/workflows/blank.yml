@@ -7,10 +7,16 @@ on:
         description: 'Version name for the release (e.g., 1.0)'
         required: true
         default: '1.0'
+      
+      release:
+        description: 'Create a GitHub Release'
+        required: true
+        default: false
+        type: boolean
 
 jobs:
   build:
-    name: Build & Release Debug APK
+    name: Build & Release WAPlus APK
     runs-on: ubuntu-latest
     permissions:
       contents: write
@@ -20,7 +26,7 @@ jobs:
         uses: actions/checkout@v4
 
       - name: Set up JDK 17
-        uses: actions/setup-java@v4
+        uses: actions/setup-java@v5
         with:
           distribution: 'zulu'
           java-version: '17'
@@ -37,16 +43,56 @@ jobs:
         id: locate_apk
         run: |
           APK_PATH=$(find app/build/outputs/apk/debug/ -name "*.apk" | head -n 1)
-          echo "apk_path=$APK_PATH" >> $GITHUB_OUTPUT
+
+          if [ -z "$APK_PATH" ]; then
+            echo "Error: Debug APK not found!"
+            exit 1
+          fi
+
+          echo "apk_path=$APK_PATH" >> "$GITHUB_OUTPUT"
           echo "Found APK at: $APK_PATH"
 
+      # Calculate SHA-256 hash of the exact APK being released
+      - name: Calculate APK SHA-256
+        id: apk_hash
+        run: |
+          APK_PATH="${{ steps.locate_apk.outputs.apk_path }}"
+
+          SHA256=$(sha256sum "$APK_PATH" | awk '{print $1}')
+
+          echo "sha256=$SHA256" >> "$GITHUB_OUTPUT"
+
+          echo ""
+          echo "=========================================="
+          echo "        WAPLUS APK VERIFICATION"
+          echo "=========================================="
+          echo "APK: $APK_PATH"
+          echo "SHA-256:"
+          echo "$SHA256"
+          echo "=========================================="
+          echo ""
+      
+      - name: Upload APK to Actions Artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: WAPlus-v${{ github.event.inputs.version_name }}-debug
+          path: ${{ steps.locate_apk.outputs.apk_path }}
+          if-no-files-found: error
+          retention-days: 90
+
       - name: Create GitHub Release
+        if: ${{ inputs.release }}
         id: create_release
         uses: softprops/action-gh-release@v2
         with:
           files: ${{ steps.locate_apk.outputs.apk_path }}
-          name: Release v${{ github.event.inputs.version_name }}
-          tag_name: v${{ github.event.inputs.version_name }}
+          name: Release v${{ inputs.version_name }}
+          tag_name: v${{ inputs.version_name }}
+          body: |
+            > [!NOTE]
+            > **Verified Build:** This release binary was compiled directly by GitHub Actions.
+            
+            🔍 [View Workflow Run & Verification Log](${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }})
           draft: false
           prerelease: false
           generate_release_notes: true
