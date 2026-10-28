@@ -4,97 +4,232 @@ on:
   workflow_dispatch:
     inputs:
       version_name:
-        description: 'Version name for the release (e.g., 1.0)'
+        description: "Release version (e.g. 1.0)"
         required: true
-        default: '1.0'
-      
+        default: "1.0"
+        type: string
       release:
-        description: 'Create a GitHub Release'
+        description: "Publish GitHub Release"
         required: true
-        default: false
+        default: true
         type: boolean
+
+permissions:
+  contents: write
+  id-token: write
+  attestations: write
 
 jobs:
   build:
-    name: Build & Release WAPlus APK
+    name: Build, Verify & Release Signed APK
     runs-on: ubuntu-latest
-    permissions:
-      contents: write
 
     steps:
       - name: Check out Repository
         uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
 
       - name: Set up JDK 17
-        uses: actions/setup-java@v5
+        uses: actions/setup-java@v4
         with:
-          distribution: 'zulu'
-          java-version: '17'
-          cache: 'gradle'
+          distribution: zulu
+          java-version: "17"
+          cache: gradle
 
       - name: Grant Execute Permission for Gradle Wrapper
         run: chmod +x gradlew
 
-      - name: Build Minified Debug APK
-        run: ./gradlew assembleDebug
-
-      # Locates the debug APK (which is auto-signed with the debug certificate)
-      - name: Locate Debug APK
-        id: locate_apk
+      - name: Decode and Verify Keystore
+        env:
+          KEYSTORE_BASE64: ${{ secrets.ANDROID_KEYSTORE_BASE64 }}
+          KEYSTORE_PASSWORD: ${{ secrets.ANDROID_KEYSTORE_PASSWORD }}
+          KEY_ALIAS: ${{ secrets.ANDROID_KEY_ALIAS }}
+        shell: bash
         run: |
-          APK_PATH=$(find app/build/outputs/apk/debug/ -name "*.apk" | head -n 1)
+          set -euo pipefail
 
-          if [ -z "$APK_PATH" ]; then
-            echo "Error: Debug APK not found!"
+          if [[ -z "${KEYSTORE_BASE64:-}" ]]; then
+            echo "::error::Missing ANDROID_KEYSTORE_BASE64 secret"
             exit 1
           fi
 
-          echo "apk_path=$APK_PATH" >> "$GITHUB_OUTPUT"
-          echo "Found APK at: $APK_PATH"
+          if [[ -z "${KEYSTORE_PASSWORD:-}" || -z "${KEY_ALIAS:-}" ]]; then
+            echo "::error::Missing keystore password or key alias"
+            exit 1
+          fi
 
-      # Calculate SHA-256 hash of the exact APK being released
-      - name: Calculate APK SHA-256
-        id: apk_hash
+          KEYSTORE_FILE="${RUNNER_TEMP}/waplus-release.jks"
+
+          printf '%s' "$KEYSTORE_BASE64" | base64 --decode > "$KEYSTORE_FILE"
+
+          if [[ ! -s "$KEYSTORE_FILE" ]]; then
+            echo "::error::Decoded keystore is empty"
+            exit 1
+          fi
+
+          FILE_TYPE="$(file -b "$KEYSTORE_FILE")"
+          echo "Decoded keystore type: $FILE_TYPE"
+
+          if [[ "$FILE_TYPE" == *"ASCII text"* ]]; then
+            echo "::error::Decoded keystore appears to be text, not binary"
+            exit 1
+          fi
+
+          chmod 600 "$KEYSTORE_FILE"
+
+          keytool -list \
+            -keystore "$KEYSTORE_FILE" \
+            -storepass "$KEYSTORE_PASSWORD" \
+            -alias "$KEY_ALIAS" > /dev/null
+
+          echo "Keystore verified successfully."
+
+      - name: Build Signed Release APK
+        env:
+          ANDROID_KEYSTORE_PATH: ${{ runner.temp }}/waplus-release.jks
+          ANDROID_KEYSTORE_PASSWORD: ${{ secrets.ANDROID_KEYSTORE_PASSWORD }}
+          ANDROID_KEY_ALIAS: ${{ secrets.ANDROID_KEY_ALIAS }}
+          ANDROID_KEY_PASSWORD: ${{ secrets.ANDROID_KEY_PASSWORD }}
         run: |
-          APK_PATH="${{ steps.locate_apk.outputs.apk_path }}"
+          ./gradlew --no-daemon --no-configuration-cache assembleRelease
 
-          SHA256=$(sha256sum "$APK_PATH" | awk '{print $1}')
+      - name: Locate and Stage Release APK
+        id: stage
+        env:
+          VERSION_NAME: ${{ inputs.version_name }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          shopt -s nullglob
 
+          APKS=(app/build/outputs/apk/release/*.apk)
+
+          if [[ "${#APKS[@]}" -ne 1 ]]; then
+            echo "::error::Expected exactly one release APK, found ${#APKS[@]}"
+            exit 1
+          fi
+
+          mkdir -p release-assets
+
+          STAGED_APK="release-assets/WAPlusXposed-v${VERSION_NAME}-release.apk"
+          cp "${APKS[0]}" "$STAGED_APK"
+
+          echo "apk_path=$STAGED_APK" >> "$GITHUB_OUTPUT"
+          echo "Staged APK: $STAGED_APK"
+
+      - name: Verify APK Signature
+        env:
+          APK_PATH: ${{ steps.stage.outputs.apk_path }}
+        shell: bash
+        run: |
+          set -euo pipefail
+
+          SDK_ROOT="${ANDROID_HOME:-${ANDROID_SDK_ROOT:-}}"
+
+          if [[ -z "$SDK_ROOT" ]]; then
+            echo "::error::Android SDK path not found"
+            exit 1
+          fi
+
+          APKSIGNER="$(find "$SDK_ROOT/build-tools" \
+            -type f -name apksigner | sort -V | tail -n 1)"
+
+          if [[ -z "$APKSIGNER" ]]; then
+            echo "::error::apksigner not found"
+            exit 1
+          fi
+
+          "$APKSIGNER" verify --verbose "$APK_PATH"
+
+          echo "APK signature verification passed."
+          echo "Signing certificate details:"
+          "$APKSIGNER" verify --print-certs "$APK_PATH"
+
+      - name: Calculate APK SHA-256
+        id: checksum
+        env:
+          APK_PATH: ${{ steps.stage.outputs.apk_path }}
+        shell: bash
+        run: |
+          set -euo pipefail
+
+          SHA256="$(sha256sum "$APK_PATH" | awk '{print $1}')"
           echo "sha256=$SHA256" >> "$GITHUB_OUTPUT"
 
-          echo ""
-          echo "=========================================="
-          echo "        WAPLUS APK VERIFICATION"
-          echo "=========================================="
-          echo "APK: $APK_PATH"
-          echo "SHA-256:"
-          echo "$SHA256"
-          echo "=========================================="
-          echo ""
-      
-      - name: Upload APK to Actions Artifacts
+          echo "SHA-256: $SHA256"
+
+      - name: Generate Release Notes
+        env:
+          VERSION_NAME: ${{ inputs.version_name }}
+          SHA256: ${{ steps.checksum.outputs.sha256 }}
+        shell: bash
+        run: |
+          set -euo pipefail
+
+          PREV_TAG="$(git describe --tags --abbrev=0 HEAD^ 2>/dev/null || true)"
+
+          {
+            echo "## What's Changed in WAPlus v${VERSION_NAME}"
+            echo
+
+            if [[ -n "$PREV_TAG" ]]; then
+              COMMITS="$(git log "${PREV_TAG}..HEAD" \
+                --pretty=format:'* %s (%h)' --no-merges)"
+              COMPARE_URL="https://github.com/${GITHUB_REPOSITORY}/compare/${PREV_TAG}...v${VERSION_NAME}"
+            else
+              COMMITS="$(git log HEAD \
+                --pretty=format:'* %s (%h)' --no-merges -n 50)"
+              COMPARE_URL="https://github.com/${GITHUB_REPOSITORY}/commits/v${VERSION_NAME}"
+            fi
+
+            if [[ -n "$COMMITS" ]]; then
+              printf '%s\n' "$COMMITS"
+            else
+              echo "* Initial release / no new commits found."
+            fi
+
+            echo
+            echo "---"
+            echo
+            echo "**SHA-256:** \`${SHA256}\`"
+            echo
+            echo "**Build:** GitHub Actions"
+            echo
+            echo "[View Workflow Run](https://github.com/${GITHUB_REPOSITORY}/actions/runs/${GITHUB_RUN_ID})"
+            echo
+            echo "**Full Changelog:** ${COMPARE_URL}"
+          } > release-notes.md
+
+      - name: Attest APK Build Provenance
+        uses: actions/attest-build-provenance@v2
+        with:
+          subject-path: ${{ steps.stage.outputs.apk_path }}
+
+      - name: Upload APK Artifact
         uses: actions/upload-artifact@v4
         with:
-          name: WAPlus-v${{ github.event.inputs.version_name }}-debug
-          path: ${{ steps.locate_apk.outputs.apk_path }}
+          name: WAPlusXposed-v${{ inputs.version_name }}-release
+          path: ${{ steps.stage.outputs.apk_path }}
           if-no-files-found: error
           retention-days: 90
 
-      - name: Create GitHub Release
+      - name: Publish GitHub Release
         if: ${{ inputs.release }}
-        id: create_release
         uses: softprops/action-gh-release@v2
         with:
-          files: ${{ steps.locate_apk.outputs.apk_path }}
-          name: Release v${{ inputs.version_name }}
+          name: WAPlus v${{ inputs.version_name }}
           tag_name: v${{ inputs.version_name }}
-          body: |
-            > [!NOTE]
-            > **Verified Build:** This release binary was compiled directly by GitHub Actions.
-            
-            🔍 [View Workflow Run & Verification Log](${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }})
+          target_commitish: ${{ github.sha }}
+          body_path: release-notes.md
+          generate_release_notes: false
+          files: |
+            ${{ steps.stage.outputs.apk_path }}
           draft: false
           prerelease: false
-          generate_release_notes: true
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Clean Up Keystore
+        if: always()
+        run: rm -f "${RUNNER_TEMP}/waplus-release.jks"
