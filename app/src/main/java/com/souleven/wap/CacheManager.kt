@@ -6,6 +6,8 @@ import de.robv.android.xposed.callbacks.XC_LoadPackage.LoadPackageParam
 import org.json.JSONArray
 import org.json.JSONObject
 import org.luckypray.dexkit.DexKitBridge
+import org.luckypray.dexkit.query.enums.UsingType
+import org.luckypray.dexkit.query.matchers.FieldMatcher
 import java.io.File
 
 object CacheManager {
@@ -30,29 +32,34 @@ object CacheManager {
             val enumName = enumClass.name
             XposedBridge.log("WAP: Enum = $enumName")
 
-            val candidates = bridge.findClass {
+            val candidates = bridge.findMethod {
                 matcher {
-                    usingStrings("FREE_TRIAL")
+                    returnType = "boolean"
+                    paramTypes(enumName)
+
+                    addUsingField(
+                        FieldMatcher()
+                            .name("retainedUntilAppRestart")
+                            .type("boolean"),
+                        UsingType.Read
+                    )
                 }
             }
-            XposedBridge.log("WAP: Candidates = ${candidates.size}")
 
-            candidates.forEach { classData ->
-                val clazz = classData.getInstance(loader)
-                val methods = mutableListOf<String>()
+            candidates.forEach { methodData ->
+                val clazz = methodData.declaredClass?.getInstance(loader)
+                val methodName = methodData.name
 
-                clazz.declaredMethods.forEach { method ->
-                    if (method.returnType != Boolean::class.javaPrimitiveType) return@forEach
-                    if (method.parameterTypes.size != 1) return@forEach
-                    if (method.parameterTypes[0].name != enumName) return@forEach
+                val reflected = clazz?.declaredMethods?.firstOrNull { method ->
+                    method.name == methodName &&
+                            method.returnType == Boolean::class.javaPrimitiveType &&
+                            method.parameterTypes.size == 1 &&
+                            method.parameterTypes[0].name == enumName
+                } ?: return@forEach
 
-                    XposedBridge.log("WAP: Found ${clazz.name}.${method.name}")
-                    methods += method.name
-                }
+                XposedBridge.log("WAP: Exact match ${clazz.name}.${reflected.name}")
 
-                if (methods.isNotEmpty()) {
-                    classes += CachedClass(clazz.name, methods)
-                }
+                classes += CachedClass(clazz.name, listOf(reflected.name))
             }
 
             return Cache(
