@@ -12,8 +12,8 @@ android {
         applicationId = "com.souleven.wap"
         minSdk = 24
         targetSdk = 37
-        versionCode = 200
-        versionName = "2.0"
+        versionCode = 300
+        versionName = "3.0"
 
         ndk {
             abiFilters.addAll(setOf("armeabi-v7a", "arm64-v8a"))
